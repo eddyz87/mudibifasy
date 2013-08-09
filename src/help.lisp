@@ -1,9 +1,13 @@
 (in-package :md)
 
-(defvar *interface-functions*
+(defparameter *interface-functions*
   (list 'auth
         'problems
-        'request-eval))
+        'request-eval
+        'guess
+        'train
+        'status
+        ))
 
 (defun help ()
   (mapcar (lambda (fsym) (format nil "~A: ~A" (string-downcase (symbol-name fsym)) (documentation fsym 'function)))
