@@ -1,0 +1,16 @@
+Required packages:
+
+- sbcl
+- rlwrap
+
+Dependencies loading:
+
+$ curl -O http://beta.quicklisp.org/quicklisp.lisp
+$ sbcl --load quicklisp.lisp
+* (quicklisp-quickstart:install)
+* (ql:quickload "drakma")
+* (ql:quickload "yason")
+
+Starting interactive session:
+
+$ ./repl.sh
