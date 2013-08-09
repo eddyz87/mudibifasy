@@ -1,3 +1,4 @@
+(in-package :md)
 
 (defun bv-atom? (term)
   (atom term))
