@@ -10,6 +10,7 @@ $ sbcl --load quicklisp.lisp
 * (quicklisp-quickstart:install)
 * (ql:quickload "drakma")
 * (ql:quickload "yason")
+* (ql:quickload "optima")
 
 Starting interactive session:
 
