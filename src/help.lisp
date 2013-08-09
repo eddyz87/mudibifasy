@@ -5,6 +5,7 @@
         'problems
         'request-eval
         'guess
+        'train
         ))
 
 (defun help ()

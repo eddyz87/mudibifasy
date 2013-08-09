@@ -66,3 +66,15 @@
   (json2lisp (do-request
                "guess"
                (lisp2json (acons "id" id (acons "program" program nil))))))
+
+(defun train (&key size operators)
+  "sends a train request, paramters:
+    &key
+      size - integer describing desired complexity
+      operators - strings designating required operators"
+  (json2lisp (do-request "train" (lisp2json
+                                   (remove
+                                     nil
+                                     (list
+                                       (when size (cons "size" size))
+                                       (when operators (cons "operators" operators))))))))
