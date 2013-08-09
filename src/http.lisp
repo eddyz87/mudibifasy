@@ -10,18 +10,49 @@
 (defun mk-url (path)
   (concatenate 'string *url* path "?" "auth=" *auth* "vpsH1H"))
 
-(defun do-request (path)
+(defun do-request (path &optional post-json-param)
   (assert *auth* () "Authentification string is not set, use 'auth' function")
   (let ((url (mk-url path)))
-    (multiple-value-bind (reply status) (drakma:http-request url)
+    (multiple-value-bind (reply status) (drakma:http-request
+                                          url
+                                          :method :POST
+                                          :content post-json-param)
       (unless (eq status 200)
         (error "The request for ~A had failed:~%  status: ~A~%  reply: ~A" url status reply))
       reply)))
 
+(defmacro with-yason (&body body)
+  `(let ((yason:*parse-object-as* :alist))
+    ,@body))
+
 (defun json2lisp (json-string)
-  (let ((yason:*parse-object-as* :alist))
+  (with-yason
     (yason:parse json-string)))
+
+(defun lisp2json (alist)
+  (with-yason
+    (with-output-to-string (stream)
+      (yason:encode-alist alist stream))))
 
 (defun problems ()
   "returns the list of available problems"
   (json2lisp (flexi-streams:octets-to-string (do-request "myproblems"))))
+
+(defun request-eval (arguments &key id program)
+  "sends an eval request, parameters:
+     arguments - list of the arguments (integer numbers)
+     &key:
+       id - string representing id of the problem
+       program - string representing a program to evaluate
+   either id or program have to be present"
+  (unless (and (or id program)
+              (not (and id program)))
+    (error "Either :id or :program have to be specified, but not both"))
+  (let ((request (lisp2json
+                   (cons
+                     (if id
+                       (cons "id" id)
+                       (cons "program" program))
+                     (list
+                       (cons "arguments" arguments))))))
+    (json2lisp (flexi-streams:octets-to-string (do-request "eval" request)))))
