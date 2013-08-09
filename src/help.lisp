@@ -5,5 +5,5 @@
         'problems))
 
 (defun help ()
-  (mapcar (lambda (fsym) (documentation fsym 'function))
+  (mapcar (lambda (fsym) (format nil "~A: ~A" (string-downcase (symbol-name fsym)) (documentation fsym 'function)))
           *interface-functions*))
