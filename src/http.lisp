@@ -78,3 +78,7 @@
                                      (list
                                        (when size (cons "size" size))
                                        (when operators (cons "operators" operators))))))))
+
+(defun status ()
+  "sends a status request"
+  (json2lisp (do-request "status")))

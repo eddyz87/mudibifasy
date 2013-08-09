@@ -6,6 +6,7 @@
         'request-eval
         'guess
         'train
+        'status
         ))
 
 (defun help ()
