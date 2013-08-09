@@ -19,7 +19,9 @@
                                           :content post-json-param)
       (unless (eq status 200)
         (error "The request for ~A had failed:~%  status: ~A~%  reply: ~A" url status reply))
-      reply)))
+      (if (stringp reply)
+          reply
+          (flexi-streams:octets-to-string reply)))))
 
 (defmacro with-yason (&body body)
   `(let ((yason:*parse-object-as* :alist))
@@ -36,7 +38,7 @@
 
 (defun problems ()
   "returns the list of available problems"
-  (json2lisp (flexi-streams:octets-to-string (do-request "myproblems"))))
+  (json2lisp (do-request "myproblems")))
 
 (defun request-eval (arguments &key id program)
   "sends an eval request, parameters:
@@ -55,4 +57,12 @@
                        (cons "program" program))
                      (list
                        (cons "arguments" arguments))))))
-    (json2lisp (flexi-streams:octets-to-string (do-request "eval" request)))))
+    (json2lisp (do-request "eval" request))))
+
+(defun guess (id program)
+  "sends a guess request, parameters:
+    id - string representing the id of the problem
+    program - string representing a program"
+  (json2lisp (do-request
+               "guess"
+               (lisp2json (acons "id" id (acons "program" program nil))))))
