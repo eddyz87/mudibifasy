@@ -1,4 +1,5 @@
 (load #P"~/quicklisp/setup.lisp")
+(declaim (optimize speed))
 (require 'asdf)
 (in-package :cl-user)
 (defun reload ()

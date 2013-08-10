@@ -1,5 +1,6 @@
 (in-package :md)
 
+
 (defun bv-atom? (term)
   (atom term))
 
@@ -37,6 +38,8 @@
   (cdr (assoc term env :test 'eq)))
 
 (defun bv-fold (bytes accum top-var func &optional (iter 0))
+  (declare ((unsigned-byte 64) bytes accum)
+           (fixnum iter))
   (if (= iter 8)
       accum
       (bv-fold (ash bytes -8)
@@ -46,14 +49,18 @@
                (1+ iter))))
 
 (defun fix-64 (v)
+  (declare ((signed-byte 66) v))
   (logand v (1- (ash 1 64))))
 
 (defun make-shift (shift)
   (lambda (v)
-    (fix-64 (ash v shift))))
+    (declare ((unsigned-byte 64) v)
+             (fixnum shift))
+      (fix-64 (ash v shift))))
 
 (defvar *bv-un-ops* (pairlis '(not shl1 shr1 shr4 shr16)
                              (list (lambda (v)
+                                     (declare ((unsigned-byte 64) v))
                                      (fix-64 (lognot v)))
                                    (make-shift 1)
                                    (make-shift -1)
@@ -65,6 +72,7 @@
                                     #'logior
                                     #'logxor
                                     (lambda (v1 v2)
+                                      (declare ((unsigned-byte 64) v1 v2))
                                       (fix-64 (+ v1 v2))))))
 
 (defun bv-compile-expr (term env)
@@ -140,10 +148,13 @@ env is assoc list of symbol -> function (first | second | third)"
 (defun bv-check-values (pr inputs results)
   (let ((cpr (bv-compile-program pr)))
     (every (lambda (i r)
+             (declare ((unsigned-byte 64) i r))
              (= (bv-run cpr i)
                 r))
            inputs
            results)))
+
+(declaim (ftype (function (t) (unsigned-byte 64)) bv-size))
 
 (defun bv-size (term)
   (if (bv-atom? term)
