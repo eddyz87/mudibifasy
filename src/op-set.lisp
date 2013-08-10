@@ -5,6 +5,10 @@
       for val = 1 then (ash val 1) do
      (setf (get op 'set-val) val))
 
+(defun op-set-empty ()
+  "Empty op set"
+  0)
+
 (defun op-set (op set)
   "Adds operator to the set"
   (logior (get op 'set-val) set))

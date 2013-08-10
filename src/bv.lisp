@@ -180,7 +180,7 @@ env is assoc list of symbol -> function (first | second | third)"
 (defun bv-op (term)
   (optima:ematch term
     ((optima:guard x (bv-atom? x))
-     nil)
+     (op-set-empty))
     ((list 'if0 e0 e1 e2)
      (op-set 'if0
 	     (op-union (bv-op e0)

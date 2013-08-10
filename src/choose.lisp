@@ -118,15 +118,17 @@
                           vars))
       (choose-merge
        (choose-do
-         op <- (choose-one (op-intersection op-set
-					    (encode-set '(not shl1 shr1 shr4 shr16))))
+         op <- (choose-one (decode-set
+                            (op-intersection op-set
+                                             (encode-set '(not shl1 shr1 shr4 shr16)))))
          sub-term <- (construct-term (1- size) vars op-set)
          (choose-return (list op sub-term)))
        (if (<= size 2)
            (fail)
            (choose-do
-             op <- (choose-one (op-intersection op-set
-						(encode-set '(and or xor plus))))
+             op <- (choose-one (decode-set 
+                                (op-intersection op-set
+                                                 (encode-set '(and or xor plus)))))
              sz <- (choose-one (loop for i from 1 to (- size 2)
                                    collect i))
              sub-term1 <- (construct-term sz vars op-set)
@@ -209,8 +211,8 @@
 
 (defun construct-program (size op-set)
   (choose-run-and-return
-   (construct-program-1 size op-set)))
+   (construct-program-1 size (encode-set op-set))))
 
 (defun guess-program (size op-set vals)
   (choose-run-and-return
-   (guess-program-1 size op-set vals)))
+   (guess-program-1 size (encode-set op-set) vals)))
