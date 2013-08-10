@@ -3,6 +3,13 @@
 (defvar *url* "http://icfpc2013.cloudapp.net/")
 (defvar *auth* nil)
 
+(defstruct problem-info
+  id
+  size
+  operators
+  body
+  solved)
+
 (defun auth (auth-string)
   "sets current authentification string to the proveded command id"
   (setf *auth* auth-string))
@@ -37,6 +44,36 @@
   (with-yason
     (yason:parse json-string)))
 
+(defun json2lisp-operators (lst)
+  (mapcar (lambda (str)
+            (intern (string-upcase str)))
+          lst))
+
+(defun json2problem-info (alist)
+  (labels ((%read (key &optional func)
+             (let ((val (assoc key alist :test #'string=)))
+               (if val
+                   (if func 
+                       (funcall func (cdr val))
+                       (cdr val))
+                   nil))))
+    (make-problem-info :size (%read "size")
+                       :id (%read "id")
+                       :operators (%read "operators" #'json2lisp-operators)
+                       :body (%read "challenge")
+                       :solved (%read "solved"))))
+
+(defun json2train-problem-info (json-string)
+  (with-yason
+    (let ((alist (yason:parse json-string)))
+      (json2problem-info alist))))
+
+(defun json2real-problems-info (json-string)
+  (with-yason
+    (let ((list (yason:parse json-string)))
+      (mapcar #'json2problem-info
+              list))))
+
 (defun lisp2json (alist)
   (with-yason
     (with-output-to-string (stream)
@@ -44,7 +81,7 @@
 
 (defun problems ()
   "returns the list of available problems"
-  (json2lisp (do-request "myproblems")))
+  (json2real-problems-info (do-request "myproblems")))
 
 (defun process-arguments (arguments)
   "converts lisp integers to strings with radix 16
@@ -88,13 +125,25 @@
     &key
       size - integer describing desired complexity
       operators - strings designating required operators"
-  (json2lisp (do-request "train" (lisp2json
-                                   (remove
-                                     nil
-                                     (list
-                                       (when size (cons "size" size))
-                                       (when operators (cons "operators" operators))))))))
+  (json2train-problem-info 
+   (do-request "train" (lisp2json
+                        (remove
+                         nil
+                         (list
+                          (when size (cons "size" size))
+                          (when operators (cons "operators" operators))))))))
 
 (defun status ()
   "sends a status request"
   (json2lisp (do-request "status")))
+
+(defparameter *all-problems* nil)
+
+(defun update-problems ()
+  (setf *all-problems*
+        (problems)))
+
+(defun my-problems ()
+  (unless *all-problems*
+    (update-problems))
+  *all-problems*)
