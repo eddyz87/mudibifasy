@@ -1,6 +1,8 @@
 (in-package :md)
 
 (defun guess-problem (problem)
+  "Tries to guess a solution for given problem, parameters:
+     problem - an instance of problem-interface"
   (handler-bind ((problem-solved (lambda (x)
                                    (declare (ignore x))
                                    (return-from guess-problem t))))

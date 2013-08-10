@@ -7,6 +7,8 @@
         'guess
         'train
         'status
+        'make-a-real-problem
+        'guess-problem
         ))
 
 (defun help ()

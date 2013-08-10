@@ -41,27 +41,32 @@
          (status (get-json-field "status" result))
          (vals (decode-arguments (get-json-field "values" result))))
     (cond
-      ((string= "win" status) (progn (signal 'problem-solved) t))
+      ((string= "win" status)
+       (warn "Solution found: ~A" str)
+       (signal 'problem-solved)
+       t)
       ((string= "mismatch" status)
-         (progn
-           (if (and (listp vals)
-                    (cddr vals))
-             (push (cons (first vals) (second vals)) (dummy-examples p))
-             (warn "Malformed values returned by guess request: ~A" result))
-           nil))
-      (t (progn
-           (warn "Unexpected status=~A in problem-guess, response is ~A" status result)
-           nil)))))
+       (warn "Solution mismatch: ~A" str)
+       (if (and (listp vals)
+                (cddr vals))
+         (push (cons (first vals) (second vals)) (dummy-examples p))
+         (warn "Malformed values returned by guess request: ~A" result))
+       nil)
+      (t (warn "Unexpected status=~A in problem-guess, response is ~A" status result)
+         nil))))
 
 (defparameter *64-bit-max* (ash 1 64))
 
-(defun make-a-real-problem (info &optional (number-of-examples 10000))
+(defun make-a-real-problem (info &optional (number-of-examples 256))
+  "create a real problem interface for the given problem, parameters:
+     info - problem-info"
+  (warn "Gona try to solve: ~A" info)
   (let* ((examples (make-hash-table :test #'eq))
          (examples-as-pairs nil)
          (iters-left number-of-examples))
     ;; collect all examples
     (loop while (< 0 iters-left) do
-          (let ((xs-size (if (< iters-left 256) iters-left 256))
+          (let ((xs-size (if (<= iters-left 256) iters-left 256))
                 (xs))
             ;; collect random x
             (loop while (< 0 xs-size) do
