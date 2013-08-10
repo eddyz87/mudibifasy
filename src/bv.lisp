@@ -137,13 +137,19 @@ env is assoc list of symbol -> function (first | second | third)"
               (bv-run cpr v))
             vals)))
 
-(defun bv-check-values (pr inputs results)
+(defun bv-check-values (pr inputs results &key (fail-func (lambda (x) 
+							    (declare (ignore x))
+							    nil)))
   (let ((cpr (bv-compile-program pr)))
-    (every (lambda (i r)
-             (= (bv-run cpr i)
-                r))
-           inputs
-           results)))
+     (mapcar (lambda (i r)
+	       (let ((result (= (bv-run cpr i)
+				r)))
+		 (unless result
+		   (unless (funcall fail-func (cons i r))
+		     (return-from bv-check-values nil)))
+		 result))
+	     inputs
+	     results)))
 
 (defun bv-size (term)
   (if (bv-atom? term)
