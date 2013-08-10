@@ -126,9 +126,10 @@ env is assoc list of symbol -> function (first | second | third)"
           (fold (%make-fold))))))
 
 (defun bv-compile-program (pr)
-  (bv-compile-expr (bv-lambda-body pr)
-                   (list (cons (bv-lambda-var pr)
-                               #'first))))
+  (let ((pr (bv-fold-constants pr)))
+    (bv-compile-expr (bv-lambda-body pr)
+                     (list (cons (bv-lambda-var pr)
+                                 #'first)))))
 
 (defun bv-run (compiled-prog val)
   (funcall compiled-prog (list val)))
@@ -209,3 +210,86 @@ env is assoc list of symbol -> function (first | second | third)"
             (bv-op e)))
     ((list 'lambda (list _) e)
      (bv-op e))))
+
+(defun bv-fold-constants (term)
+  (macrolet ((with-number (op &body body)
+                          `(let ((e1 (bv-fold-constants e1)))
+                             (if (numberp e1)
+                               (progn ,@body)
+                               (list ,op e1))))
+             (with-number2 (op &rest variants)
+                           (let ((e1-body (find-if (lambda (x) (eq (car x) :e1)) variants))
+                                 (both-body (find-if (lambda (x) (eq (car x) :both)) variants))
+                                 (default-body (find-if (lambda (x) (eq (car x) :default)) variants)))
+                             `(let ((e1 (bv-fold-constants e1))
+                                    (e2 (bv-fold-constants e2)))
+                                (cond
+                                  ((and (numberp e1)
+                                        (numberp e2)
+                                        ,@both-body))
+                                  ((numberp e1) ,@e1-body)
+                                  ((numberp e2)
+                                   (let ((e1 e2)
+                                         (e2 e1))
+                                     ,@e1-body))
+                                  (t ,(if default-body
+                                        `(progn ,@default-body)
+                                        `(list ,op e1 e2))))))))
+    (optima:ematch term
+                   ((list 'if0 e1 e2 e3)
+                    (if (numberp e1)
+                      (if (= 0 e1)
+                        (bv-fold-constants e2)
+                        (bv-fold-constants e3))
+                      (list 'if0
+                            (bv-fold-constants e1)
+                            (bv-fold-constants e2)
+                            (bv-fold-constants e3))))
+                   ((list 'not   e1) (with-number 'not   (fix-64 (lognot e1))))  
+                   ((list 'shl1  e1) (with-number 'shl1  (fix-64 (ash e1 1))))  
+                   ((list 'shr1  e1) (with-number 'shr1  (ash e1 -1)))
+                   ((list 'shr4  e1) (with-number 'shr4  (ash e1 -4)))
+                   ((list 'shr16 e1) (with-number 'shr16 (ash e1 -16)))
+                   ((list 'and e1 e2)
+                    (with-number2
+                      'and
+                      (:e1 (cond ((= e1 0) 0)
+                                 ((= e1 #xFFFFFFFFFFFFFFFF) e2)
+                                 (t (list 'and e1 e2))))
+                      (:both (logand e1 e2))))
+                   ((list 'or e1 e2)
+                    (with-number2
+                      'or
+                      (:e1 (cond ((= e1 0) e2)
+                                 ((= e1 #xFFFFFFFFFFFFFFFF) e1)
+                                 (t (list 'or e1 e2))))
+                      (:both (logior e1 e2))))
+                   ((list 'xor e1 e2)
+                    (with-number2
+                      'xor
+                      (:e1 (cond ((= e1 0) e2)
+                                 ((= e1 #xFFFFFFFFFFFFFFFF) e2)
+                                 (t (list 'xor e1 e2))))
+                      (:both (logxor e1 e2))
+                      (:default
+                        (if (equal e1 e2)
+                          0 
+                          (list 'xor e1 e2)))))
+                   ((list 'plus e1 e2)
+                    (with-number2
+                      'plus
+                      (:e1 (cond ((= e1 0) e2)
+                                 (t (list 'plus e1 e2))))
+                      (:both (fix-64 (+ e1 e2)))))
+                   ((list 'lambda x e1)
+                    (let ((e1 (bv-fold-constants e1)))
+                      (list 'lambda x e1)))
+                   ((list 'fold e1 e2 e3)
+                     (let ((e1 (bv-fold-constants e1))
+                           (e2 (bv-fold-constants e2))
+                           (e3 (bv-fold-constants e3)))
+                       (list 'fold e1 e2 e3)))
+                   (x x))))
+        
+         
+    
