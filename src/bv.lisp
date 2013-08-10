@@ -131,6 +131,11 @@ env is assoc list of symbol -> function (first | second | third)"
                      (list (cons (bv-lambda-var pr)
                                  #'first)))))
 
+(defun bv-compile-program1 (pr)
+  (bv-compile-expr (bv-lambda-body pr)
+                   (list (cons (bv-lambda-var pr)
+                               #'first))))
+
 (defun bv-run (compiled-prog val)
   (funcall compiled-prog (list val)))
 
