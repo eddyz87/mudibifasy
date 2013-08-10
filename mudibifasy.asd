@@ -7,6 +7,7 @@
                (:file "src/choose"  :depends-on ("src/packages"))
                (:file "src/glue"    :depends-on ("src/packages" "src/http"))
                (:file "src/solve"   :depends-on ("src/choose" "src/glue"))
-	       (:file "src/bv-test" :depends-on ("src/bv" "src/http"))))
+	       (:file "src/bv-test" :depends-on ("src/bv" "src/http"))
+	       (:file "src/op-set")))
 
 (asdf:load-system :mudibifasy)
