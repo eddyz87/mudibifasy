@@ -161,3 +161,6 @@
   (unless *all-problems*
     (update-problems))
   *all-problems*)
+
+(defun get-json-field (field obj)
+  (cdr (assoc field obj :test #'equal)))
