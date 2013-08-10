@@ -68,11 +68,11 @@
              (let ((s (gensym)))
                (cond ((null (cdr cls))
                       (car cls))
-                     ((eq (second (car cls))
+                     ((eq (second cls)
                           '<-)
-                      `(choose-bind ,(caddr (car cls))
-                           (lambda (,(car (car cls)))
-                             ,(%tr (cdr cls)))))
+                      `(choose-bind ,(caddr cls)
+                           (lambda (,(car cls))
+                             ,(%tr (cdddr cls)))))
                      (t 
                       `(choose-bind ,(car cls)
                            (lambda (,s)
@@ -85,10 +85,10 @@
 (defun choose-test (sum)
   (choose-run 
    (choose-do 
-     (v1 <- (choose-merge
-             (choose-one (loop for i from 1 to 10 collect i))
-             (choose-one (loop for i from 100 to 110 collect i))))
-     (v2 <- (choose-one (loop for i from 1 to 10 collect i)))
+     v1 <- (choose-merge
+            (choose-one (loop for i from 1 to 10 collect i))
+            (choose-one (loop for i from 100 to 110 collect i)))
+     v2 <- (choose-one (loop for i from 1 to 10 collect i))
      (if (= (+ v1 v2)
             sum)
          (choose-return (cons v1 v2))
@@ -99,7 +99,7 @@
    (lambda ()
      (error "Not found"))))
 
-(defun choose-merge (m1 m2)
+(defun choose-plus (m1 m2)
   (lambda (cont fail-cont)
     (funcall m1 cont
              (lambda ()
@@ -107,44 +107,109 @@
                         cont
                         fail-cont)))))
 
+(defun choose-merge (&rest args)
+  (reduce #'choose-plus
+          (cdr args)
+          :initial-value (car args)))
 
-(defun construct-term (size vars)
+(defun construct-term (size vars op-set was-fold)
   (if (= size 1)
       (choose-one (append (list 0 1)
                           vars))
       (choose-merge
        (choose-do
-         (op <- (choose-one '(not shl1 shr1 shr4 shr16)))
-         (sub-term <- (construct-term (1- size) vars))
+         op <- (choose-one (intersection op-set
+                                         '(not shl1 shr1 shr4 shr16)))
+         sub-term <- (construct-term (1- size) vars op-set was-fold)
          (choose-return (list op sub-term)))
        (if (<= size 2)
            (fail)
            (choose-do
-             (op <- (choose-one '(and or xor plus)))
-             (sz <- (choose-one (loop for i from 1 to (- size 2)
-                                   collect i)))
-             (sub-term1 <- (construct-term sz vars))
-             (sub-term2 <- (construct-term (- size sz 1) vars))
+             op <- (choose-one (intersection op-set
+                                             '(and or xor plus)))
+             sz <- (choose-one (loop for i from 1 to (- size 2)
+                                   collect i))
+             sub-term1 <- (construct-term sz vars op-set was-fold)
+             sub-term2 <- (construct-term (- size sz 1) vars op-set was-fold)
              (choose-return
               (list op sub-term1
-                    sub-term2)))))))
+                    sub-term2))))
+       (if (or (<= size 3)
+               (not (member 'if0 op-set)))
+           (fail)
+           (choose-do
+             sz <- (choose-one (loop for i from 2 to (- size 2)
+                                   collect i))
+             sz1 <- (choose-one (loop for i from 1 to (- sz 1)
+                                    collect i))
+             sub-term-t <- (construct-term sz1 vars op-set was-fold)
+             sub-term-f <- (construct-term (- sz sz1) vars op-set was-fold)
+             sub-term-c <- (construct-term (- size sz 1) vars op-set was-fold)
+             (choose-return
+              (list 'if0 
+                    sub-term-c
+                    sub-term-t
+                    sub-term-f))))
+       (if (or (<= size 4)
+               was-fold
+               (not (or (member 'fold op-set)
+                        (member 'tfold op-set))))
+           (fail)
+           (choose-do
+             sz <- (choose-one (loop for i from 2 to (- size 3)
+                                   collect i))
+             sz1 <- (choose-one (loop for i from 1 to (- sz 1)
+                                    collect i))
+             sub-term-1 <- (construct-term sz1 vars op-set t)
+             sub-term-2 <- (construct-term (- sz sz1) vars op-set t)
+             v1 <- (choose-one (cons 'x vars))
+             v2 <- (choose-one (cons 'z vars))
+             sub-term-b <- (construct-term (- size sz 2) 
+                                            (append vars (list v1 v2))
+                                            op-set
+                                            t)
+             (choose-return
+              (list 'fold
+                    sub-term-1
+                    sub-term-2
+                    (list 'lambda (list v1 v2)
+                          sub-term-b))))))))
 
 (defun construct-program-1 (size op-set)
   (choose-do
-    (term <- (construct-term (1- size) '(x)))
+    term <- (construct-term (1- size) '(x) op-set nil)
     (let ((progr (list 'lambda (list 'x)
                        term)))
       (let ((ops (bv-operators progr)))
+        ;; (format t "Test : ~A~%"
+        ;;         (string-downcase (format nil "~A"
+        ;;                                  progr)))
         (if (and (subsetp ops op-set)
                  (subsetp op-set ops))
             (choose-return progr)
             (fail))))))
 
-(defun construct-program (size op-set)
+(defun guess-program-1 (size op-set vals)
+  (choose-do
+    term <- (construct-program-1 size op-set)
+    (if (bv-check-values term (mapcar #'car vals)
+                         (mapcar #'cdr vals))
+        (choose-return term)
+        (fail))))
+
+(defun choose-run-and-return (choose-comp)
   (choose-run
-   (construct-program-1 size op-set)
+   choose-comp
    (lambda (v fail-cont)
      (declare (ignore fail-cont))
-     (return-from construct-program v))
+     (return-from choose-run-and-return v))
    (lambda ()
-     (return-from construct-program nil))))
+     (return-from choose-run-and-return nil))))
+
+(defun construct-program (size op-set)
+  (choose-run-and-return
+   (construct-program-1 size op-set)))
+
+(defun guess-program (size op-set vals)
+  (choose-run-and-return
+   (guess-program-1 size op-set vals)))

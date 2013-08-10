@@ -13,15 +13,21 @@
 (defun do-request (path &optional post-json-param)
   (assert *auth* () "Authentification string is not set, use 'auth' function")
   (let ((url (mk-url path)))
-    (multiple-value-bind (reply status) (drakma:http-request
-                                          url
-                                          :method :POST
-                                          :content post-json-param)
-      (unless (eq status 200)
-        (error "The request for ~A had failed:~%  status: ~A~%  reply: ~A" url status reply))
-      (if (stringp reply)
-          reply
-          (flexi-streams:octets-to-string reply)))))
+    (labels ((%try-do-request ()
+	       (multiple-value-bind (reply status) (drakma:http-request
+						    url
+						    :method :POST
+						    :content post-json-param)
+		 (case status
+		   (200 (if (stringp reply)
+			    reply
+			    (flexi-streams:octets-to-string reply)))
+		   (429 (warn "Response: try later again. Sleeping for a second...")
+			(sleep 1)
+			(%try-do-request))
+		   (otherwise 
+		    (error "The request for ~A had failed:~%  status: ~A~%  reply: ~A" url status reply))))))
+      (%try-do-request))))
 
 (defmacro with-yason (&body body)
   `(let ((yason:*parse-object-as* :alist))
