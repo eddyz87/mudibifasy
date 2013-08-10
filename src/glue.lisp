@@ -50,7 +50,7 @@
        (signal 'problem-solved)
        t)
       ((string= "mismatch" status)
-       (warn "Solution mismatch: ~A" str)
+       (warn "Solution mismatch: ~A vals ~A" str vals)
        (if (and (listp vals)
                 (cddr vals))
          (progn
@@ -60,7 +60,8 @@
                    (request-more-examples
                      (problem-id p)
                      (problem-known-values p)
-                     *guess-mismatch-known-values-step*))))
+                     *guess-mismatch-known-values-step*)
+                   (dummy-examples p))))
          (warn "Malformed values returned by guess request: ~A" result))
        nil)
       (t (warn "Unexpected status=~A in problem-guess, response is ~A" status result)
