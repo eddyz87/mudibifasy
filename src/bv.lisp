@@ -37,7 +37,7 @@
   (cdr (assoc term env :test 'eq)))
 
 (defun bv-fold (bytes accum top-var func &optional (iter 0))
-  (if (= iter 9)
+  (if (= iter 8)
       accum
       (bv-fold (ash bytes -8)
                (funcall func (list top-var (logand bytes 255) accum))
@@ -46,7 +46,7 @@
                (1+ iter))))
 
 (defun fix-64 (v)
-  (logand v (ash 1 64)))
+  (logand v (1- (ash 1 64))))
 
 (defun make-shift (shift)
   (lambda (v)
@@ -127,6 +127,9 @@ env is assoc list of symbol -> function (first | second | third)"
 
 (defun bv-read-program (str)
   (read-from-string str))
+
+(defun bv-program-to-string (pr)
+  (string-downcase (format nil "~A" pr)))
 
 (defun bv-run-values (pr vals)
   (let ((cpr (bv-compile-program pr)))
