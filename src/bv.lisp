@@ -182,22 +182,22 @@ env is assoc list of symbol -> function (first | second | third)"
     ((optima:guard x (bv-atom? x))
      nil)
     ((list 'if0 e0 e1 e2)
-     (union (list 'if0)
-            (union (bv-op e0)
-                   (union (bv-op e1)
-                          (bv-op e2)))))
+     (op-set 'if0
+	     (op-union (bv-op e0)
+		       (op-union (bv-op e1)
+				 (bv-op e2)))))
     ((list op e1)
-     (union (list op)
-            (bv-op e1)))
+     (op-set op
+	     (bv-op e1)))
     ((list op e1 e2)
-     (union (list op)
-            (union (bv-op e1)
-                   (bv-op e2))))
+     (op-set op
+	     (op-union (bv-op e1)
+		       (bv-op e2))))
     ((list 'fold e0 e1 (list 'lambda (list _ _) e2))
-     (union (list 'fold)
-            (union (bv-op e0)
-                   (union (bv-op e1)
-                          (bv-op e2)))))))
+     (op-set 'fold
+	     (op-union (bv-op e0)
+		       (op-union (bv-op e1)
+				 (bv-op e2)))))))
 
 (defun bv-operators (term)
   (optima:ematch term
@@ -205,7 +205,7 @@ env is assoc list of symbol -> function (first | second | third)"
      (unless (and (eq x x1)
                   (eq x1 x2))
        (optima:fail))
-     (union (list 'tfold)
-            (bv-op e)))
+     (op-set 'tfold
+	     (bv-op e)))
     ((list 'lambda (list _) e)
      (bv-op e))))

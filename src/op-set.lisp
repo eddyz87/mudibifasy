@@ -21,6 +21,17 @@
   "Computes union of two sets"
   (logior set-1 set-2))
 
+(defun op-intersection (set-1 set-2)
+  "Computes intersection of two sets"
+  (logand set-1 set-2))
+
+(defun encode-set (ops)
+  "Converts list of operators int set"
+  (loop for op in ops
+        with set = 0 do
+       (setf set (op-set op set))
+       finally (return set)))
+
 (defun decode-set (set)
   "Converts set into list of symbols"
   (let (result)

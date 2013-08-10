@@ -118,15 +118,15 @@
                           vars))
       (choose-merge
        (choose-do
-         op <- (choose-one (intersection op-set
-                                         '(not shl1 shr1 shr4 shr16)))
+         op <- (choose-one (op-intersection op-set
+					    (encode-set '(not shl1 shr1 shr4 shr16))))
          sub-term <- (construct-term (1- size) vars op-set)
          (choose-return (list op sub-term)))
        (if (<= size 2)
            (fail)
            (choose-do
-             op <- (choose-one (intersection op-set
-                                             '(and or xor plus)))
+             op <- (choose-one (op-intersection op-set
+						(encode-set '(and or xor plus))))
              sz <- (choose-one (loop for i from 1 to (- size 2)
                                    collect i))
              sub-term1 <- (construct-term sz vars op-set)
@@ -135,7 +135,7 @@
               (list op sub-term1
                     sub-term2))))
        (if (or (<= size 3)
-               (not (member 'if0 op-set)))
+               (not (op-test 'if0 op-set)))
            (fail)
            (choose-do
              sz <- (choose-one (loop for i from 2 to (- size 2)
@@ -151,9 +151,9 @@
                     sub-term-t
                     sub-term-f))))
        (if (or (<= size 4)
-               (not (member 'fold op-set)))
+               (not (op-test 'fold op-set)))
            (fail)
-           (let ((no-fold-set (remove 'fold op-set)))
+           (let ((no-fold-set (op-unset 'fold op-set)))
              (choose-do
                sz <- (choose-one (loop for i from 2 to (- size 3)
                                     collect i))
@@ -175,9 +175,9 @@
 
 (defun construct-program-1 (size op-set)
   (choose-do
-    term <- (if (member 'tfold op-set)
+    term <- (if (op-test 'tfold op-set)
                 (choose-do
-                  t1 <- (construct-term (- size 5) '(x y) (remove 'tfold op-set))
+                  t1 <- (construct-term (- size 5) '(x y) (op-unset 'tfold op-set))
                   (choose-return `(fold x 0 (lambda (x y) ,t1))))
                 (construct-term (1- size) '(x) op-set))
     (let ((progr `(lambda (x)
@@ -186,8 +186,7 @@
         ;; (format t "Test : ~A~%"
         ;;         (string-downcase (format nil "~A"
         ;;                                  progr)))
-        (if (and (subsetp ops op-set)
-                 (subsetp op-set ops))
+        (if (eq ops op-set)
             (choose-return progr)
             (fail))))))
 
