@@ -46,6 +46,15 @@
   "returns the list of available problems"
   (json2lisp (do-request "myproblems")))
 
+(defun process-arguments (arguments)
+  "converts lisp integers to strings with radix 16
+     arguments - list of the arguments (integer numbers)"
+  (mapcar (lambda (arg)
+	    (concatenate 'string
+			 "0x"
+			 (write-to-string arg :base 16)))
+	  arguments))
+
 (defun request-eval (arguments &key id program)
   "sends an eval request, parameters:
      arguments - list of the arguments (integer numbers)
@@ -56,13 +65,14 @@
   (unless (and (or id program)
               (not (and id program)))
     (error "Either :id or :program have to be specified, but not both"))
-  (let ((request (lisp2json
+  (let* ((processed-args (process-arguments arguments))
+	 (request (lisp2json
                    (cons
                      (if id
                        (cons "id" id)
                        (cons "program" program))
                      (list
-                       (cons "arguments" arguments))))))
+                       (cons "arguments" processed-args))))))
     (json2lisp (do-request "eval" request))))
 
 (defun guess (id program)
