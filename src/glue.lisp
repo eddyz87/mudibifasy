@@ -34,7 +34,11 @@
 
 (defclass a-real-problem (dummy-problem)
   ((id :accessor problem-id
-       :initarg :id)))
+       :initarg :id)
+   (known-values :accessor problem-known-values
+                 :initarg :known-values)))
+
+(defvar *guess-mismatch-known-values-step* 32)
 
 (defmethod problem-guess ((p a-real-problem) str)
   (let* ((result (guess (problem-id p) str))
@@ -49,7 +53,14 @@
        (warn "Solution mismatch: ~A" str)
        (if (and (listp vals)
                 (cddr vals))
-         (push (cons (first vals) (second vals)) (dummy-examples p))
+         (progn
+           (push (cons (first vals) (second vals)) (dummy-examples p))
+           (setf (dummy-examples p)
+                 (append
+                   (request-more-examples
+                     (problem-id p)
+                     (problem-known-values p)
+                     *guess-mismatch-known-values-step*))))
          (warn "Malformed values returned by guess request: ~A" result))
        nil)
       (t (warn "Unexpected status=~A in problem-guess, response is ~A" status result)
@@ -57,12 +68,8 @@
 
 (defparameter *64-bit-max* (ash 1 64))
 
-(defun make-a-real-problem (info &optional (number-of-examples 256))
-  "create a real problem interface for the given problem, parameters:
-     info - problem-info"
-  (warn "Gona try to solve: ~A" info)
-  (let* ((examples (make-hash-table :test #'eq))
-         (examples-as-pairs nil)
+(defun request-more-examples (id known-values number-of-examples)
+  (let* ((examples-as-pairs nil)
          (iters-left number-of-examples))
     ;; collect all examples
     (loop while (< 0 iters-left) do
@@ -71,19 +78,27 @@
             ;; collect random x
             (loop while (< 0 xs-size) do
                   (let ((x (random *64-bit-max*)))
-                    (unless (gethash x examples)
-                      (setf (gethash x examples) t)
+                    (unless (gethash x known-values)
+                      (setf (gethash x known-values) t)
                       (push x xs)
                       (decf xs-size))))
             ;; request f x
             (setf examples-as-pairs
                   (append
-                    (mapcar #'cons xs (request-eval xs :id (problem-info-id info)))
+                    (mapcar #'cons xs (request-eval xs :id id))
                     examples-as-pairs))
             (decf iters-left 256)))
+    examples-as-pairs))
+
+(defun make-a-real-problem (info &optional (number-of-examples *guess-mismatch-known-values-step*))
+  "create a real problem interface for the given problem, parameters:
+     info - problem-info"
+  (warn "Gona try to solve: ~A" info)
+  (let* ((examples (make-hash-table :test #'eq)))
     (make-instance
       'a-real-problem
       :id (problem-info-id info)
       :size (problem-info-size info)
-      :examples examples-as-pairs
+      :examples (request-more-examples (problem-info-id info) examples number-of-examples)
+      :known-values examples
       :ops (problem-info-operators info))))
