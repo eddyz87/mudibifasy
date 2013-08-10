@@ -177,9 +177,13 @@
 
 (defun construct-program-1 (size op-set)
   (choose-do
-    term <- (construct-term (1- size) '(x) op-set nil)
-    (let ((progr (list 'lambda (list 'x)
-                       term)))
+    term <- (if (member 'tfold op-set)
+                (choose-do
+                  t1 <- (construct-term (- size 5) '(x y) (remove 'tfold op-set) nil)
+                  (choose-return `(fold x 0 (lambda (x y) ,t1))))
+                (construct-term (1- size) '(x) op-set nil))
+    (let ((progr `(lambda (x)
+                    ,term)))
       (let ((ops (bv-operators progr)))
         ;; (format t "Test : ~A~%"
         ;;         (string-downcase (format nil "~A"

@@ -128,6 +128,9 @@ env is assoc list of symbol -> function (first | second | third)"
 (defun bv-read-program (str)
   (read-from-string str))
 
+(defun bv-program-to-string (pr)
+  (string-downcase (format nil "~A" pr)))
+
 (defun bv-run-values (pr vals)
   (let ((cpr (bv-compile-program pr)))
     (mapcar (lambda (v)
