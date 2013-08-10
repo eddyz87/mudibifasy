@@ -9,7 +9,7 @@
     (choose-run-and-return
      (choose-do
        term <- (construct-program-1 (problem-size problem)
-                                    (problem-operators problem))
+                                    (encode-set (problem-operators problem)))
        (let ((vals (problem-examples problem)))
          (if (bv-check-values term (mapcar #'car vals)
                               (mapcar #'cdr vals))
