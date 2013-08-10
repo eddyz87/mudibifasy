@@ -1,3 +1,5 @@
+(in-package :md)
+
 (defclass problem-interface () ())
 
 (define-condition problem-solved () ())
@@ -25,5 +27,7 @@
 (defmethod problem-size ((p dummy-problem)) (dummy-size p))
 (defmethod problem-examples ((p dummy-problem)) (dummy-examples p))
 (defmethod problem-guess ((p dummy-problem) str)
+  (warn "Trying solution: '~A'~%" str)
   (when (string= str (dummy-program p))
+    (warn "Solution found: '~A'~%" str)
     (signal (make-instance 'problem-solved))))
