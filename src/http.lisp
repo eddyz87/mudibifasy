@@ -46,13 +46,20 @@
   "returns the list of available problems"
   (json2lisp (do-request "myproblems")))
 
-(defun process-arguments (arguments)
+(defun encode-arguments (arguments)
   "converts lisp integers to strings with radix 16
      arguments - list of the arguments (integer numbers)"
   (mapcar (lambda (arg)
 	    (concatenate 'string
 			 "0x"
 			 (write-to-string arg :base 16)))
+	  arguments))
+
+(defun decode-arguments (arguments)
+  "converts strings to list integers
+     arguments - list of strings"
+  (mapcar (lambda (arg)
+	    (parse-integer arg :start 2 :radix 16))
 	  arguments))
 
 (defun request-eval (arguments &key id program)
@@ -62,18 +69,25 @@
        id - string representing id of the problem
        program - string representing a program to evaluate
    either id or program have to be present"
-  (unless (and (or id program)
-              (not (and id program)))
-    (error "Either :id or :program have to be specified, but not both"))
-  (let* ((processed-args (process-arguments arguments))
-	 (request (lisp2json
-                   (cons
-                     (if id
-                       (cons "id" id)
-                       (cons "program" program))
-                     (list
-                       (cons "arguments" processed-args))))))
-    (json2lisp (do-request "eval" request))))
+  (labels ((%find-in-response (key response)
+	     (cdr (assoc key response :test #'string=))))
+    (unless (and (or id program)
+		 (not (and id program)))
+      (error "Either :id or :program have to be specified, but not both"))
+    (let* ((encoded-args (encode-arguments arguments))
+	   (request (lisp2json
+		     (cons
+		      (if id
+			  (cons "id" id)
+			  (cons "program" program))
+		      (list
+		       (cons "arguments" encoded-args)))))
+	   (response (json2lisp (do-request "eval" request)))
+	   (status (%find-in-response "status" response)))
+      (if (string= status "ok")
+	  (decode-arguments (%find-in-response "outputs" response))
+	  (error "~A" (%find-in-response "message" response))))))
+	
 
 (defun guess (id program)
   "sends a guess request, parameters:
