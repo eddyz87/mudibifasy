@@ -130,7 +130,7 @@
              sz <- (choose-one (loop for i from 1 to (- size 2)
                                    collect i))
              sub-term1 <- (construct-term sz vars op-set was-fold)
-             sub-term2 <- (construct-term (- size sz 1) op-set vars was-fold)
+             sub-term2 <- (construct-term (- size sz 1) vars op-set was-fold)
              (choose-return
               (list op sub-term1
                     sub-term2))))
@@ -189,11 +189,27 @@
             (choose-return progr)
             (fail))))))
 
-(defun construct-program (size op-set)
+(defun guess-program-1 (size op-set vals)
+  (choose-do
+    term <- (construct-program-1 size op-set)
+    (if (bv-check-values term (mapcar #'car vals)
+                         (mapcar #'cdr vals))
+        (choose-return term)
+        (fail))))
+
+(defun choose-run-and-return (choose-comp)
   (choose-run
-   (construct-program-1 size op-set)
+   choose-comp
    (lambda (v fail-cont)
      (declare (ignore fail-cont))
-     (return-from construct-program v))
+     (return-from choose-run-and-return v))
    (lambda ()
-     (return-from construct-program nil))))
+     (return-from choose-run-and-return nil))))
+
+(defun construct-program (size op-set)
+  (choose-run-and-return
+   (construct-program-1 size op-set)))
+
+(defun guess-program (size op-set vals)
+  (choose-run-and-return
+   (guess-program-1 size op-set vals)))
