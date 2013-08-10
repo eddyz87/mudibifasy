@@ -39,10 +39,10 @@
 (defmethod problem-guess ((p a-real-problem) str)
   (let* ((result (guess (problem-id p) str))
          (status (get-json-field "status" result))
-         (vals (get-json-field "values" result)))
+         (vals (decode-arguments (get-json-field "values" result))))
     (cond
       ((string= "win" status) (progn (signal 'problem-solved) t))
-      ((string= "mismatch")
+      ((string= "mismatch" status)
          (progn
            (if (and (listp vals)
                     (cddr vals))
@@ -53,7 +53,9 @@
            (warn "Unexpected status=~A in problem-guess, response is ~A" status result)
            nil)))))
 
-(defun make-a-real-problem (id size ops &optional (number-of-examples 10000))
+(defparameter *64-bit-max* (ash 1 64))
+
+(defun make-a-real-problem (info &optional (number-of-examples 10000))
   (let* ((examples (make-hash-table :test #'eq))
          (examples-as-pairs nil)
          (iters-left number-of-examples))
@@ -71,15 +73,12 @@
             ;; request f x
             (setf examples-as-pairs
                   (append
-                    (mapcar #'cons xs (request-eval xs :id id))
+                    (mapcar #'cons xs (request-eval xs :id (problem-info-id info)))
                     examples-as-pairs))
             (decf iters-left 256)))
     (make-instance
       'a-real-problem
-      :id id
-      :size size
+      :id (problem-info-id info)
+      :size (problem-info-size info)
       :examples examples-as-pairs
-      :ops (??? ops))))
-  
-  
- 
+      :ops (problem-info-operators info))))
