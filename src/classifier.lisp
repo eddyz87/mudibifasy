@@ -81,6 +81,12 @@
   (= (logand (cdr v1) (cdr v2))
      r1))
 
+(def-two-point-classifier plus-distr (v1 v2 r1)
+  (lambda (v1 v2)
+    (fix-64 (+ v1 v2)))
+  (= (fix-64 (+ (cdr v1) (cdr v2)))
+     r1))
+
 (def-two-point-classifier or-distr (v1 v2 r1)
   (lambda (v1 v2)
     (logior v1 v2))
@@ -101,6 +107,9 @@
 
 (def-two-point-promoter xor-add (v1 v2) 
   (logxor v1 v2))
+
+(def-two-point-promoter plus-add (v1 v2) 
+  (fix-64 (+ v1 v2)))
 
 (defvar *classifier-threshold* 0.4)
 
@@ -191,3 +200,82 @@
                        *promoters*)))
     (append vals adds)))
 
+(defun build-term-cond-op-table-1 (term table context)
+  (labels ((%add (sym)
+             (let ((val (gethash (cons sym context) table)))
+               (if val
+                   (setf (gethash (cons sym context) table)
+                         (1+ val))
+                   (setf (gethash (cons sym context) table)
+                         1)))))
+    (optima:ematch term
+      ((optima:guard x (bv-atom? x))
+       nil)
+      ((list 'lambda (list _) e1)
+        (%add 'lambda)
+        (build-term-cond-op-table-1 e1 table 'lambda))
+      ((list 'if0 e0 e1 e2)
+        (%add 'if0)
+        (build-term-cond-op-table-1 e0 table 'if0)
+        (build-term-cond-op-table-1 e1 table 'if0)
+        (build-term-cond-op-table-1 e2 table 'if0))
+      ((list op e1)
+        (%add op)
+        (build-term-cond-op-table-1 e1 table op))
+      ((list op e1 e2)
+       (%add op)
+       (build-term-cond-op-table-1 e1 table op)
+       (build-term-cond-op-table-1 e2 table op)
+       )
+      ((list 'fold e0 e1 (list 'lambda (list _ _) e2))
+        (%add 'fold)
+        (build-term-cond-op-table-1 e0 table 'if0)
+        (build-term-cond-op-table-1 e1 table 'if0)
+        (build-term-cond-op-table-1 e2 table 'if0)))))
+
+(defun build-term-cond-op-table (term)
+  (let ((tab-1 (make-hash-table :test #'equal))
+        (tab-2 (make-hash-table :test #'equal))
+        (sz (bv-size term)))
+    (build-term-cond-op-table-1 term tab-1 nil)
+    (maphash (lambda (key val)
+               (setf (gethash key tab-2)
+                     (/ val sz)))
+             tab-1)
+    tab-2))
+
+(defun build-term-correspondence (term num-vals)
+  (let* ((promoted (promote-vals (loop for i from 1 to num-vals
+                                    collect (random *64-bit-max*))))
+         (tab (build-term-cond-op-table term))
+         (classifiers (check-classifiers (mapcar #'cons promoted (bv-run-values term promoted)))))
+    (cons tab classifiers)))
+
+(defun print-term-correspondence (corr stream)
+  (format stream "{ ")
+  (maphash (lambda (key val)
+             (format stream "~A => ~A, " key val))
+           (car corr))
+  (format stream "} ==> ")
+  (format stream "~A" (cdr corr))
+  (format stream "~%"))
+
+(defun build-terms-correspondences (size op-set num-terms num-vals)
+  (let ((*choose-randomize* t))
+    (let ((corrs nil)
+          (cur-num 0))
+      (choose-run-and-return
+       (choose-do
+         term <- (construct-program-1 size
+                                      (encode-set op-set))
+         (let ((corr (build-term-correspondence term num-vals)))
+           (push corr corrs)
+           (incf cur-num)
+           (if (<= cur-num num-terms)
+               (fail)
+               (choose-return corrs))))))))
+
+(defun print-correspondences (corrs)
+  (mapcar (lambda (corr)
+            (print-term-correspondence corr t))
+          corrs))

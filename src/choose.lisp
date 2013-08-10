@@ -49,17 +49,20 @@
     (declare (ignore cont))
     (funcall fail-cont)))
 
+(defvar *choose-randomize* nil)
+
 (defun choose-one (lst)
-  (labels ((%cont-with-list (l cont fail-cont)
-             (if (null l)
-                 (funcall fail-cont)
-                 (%cont-with-list (cdr l) cont fail-cont))))
-    (lambda (cont fail-cont)
-      (if (null lst)
-          (funcall fail-cont)
-          (funcall cont (car lst)
+  (lambda (cont fail-cont)
+    (if (null lst)
+        (funcall fail-cont)
+        (let ((first-val (if *choose-randomize*
+                             (nth (random (length lst)) lst)
+                             (car lst))))
+          (funcall cont first-val
                    (lambda ()
-                     (funcall (choose-one (cdr lst))
+                     (funcall (choose-one (if *choose-randomize*
+                                              (remove first-val lst :test #'eq)
+                                              (cdr lst)))
                               cont
                               fail-cont)))))))
 
@@ -112,6 +115,9 @@
           (cdr args)
           :initial-value (car args)))
 
+(defvar *unary-op-set* (encode-set '(not shl1 shr1 shr4 shr16)))
+(defvar *binary-op-set* (encode-set '(and or xor plus)))
+
 (defun construct-term (size vars op-set)
   (if (= size 1)
       (choose-one (append (list 0 1)
@@ -120,7 +126,7 @@
        (choose-do
          op <- (choose-one (decode-set
                             (op-intersection op-set
-                                             (encode-set '(not shl1 shr1 shr4 shr16)))))
+                                             *unary-op-set*)))
          sub-term <- (construct-term (1- size) vars op-set)
          (choose-return (list op sub-term)))
        (if (<= size 2)
@@ -128,8 +134,9 @@
            (choose-do
              op <- (choose-one (decode-set 
                                 (op-intersection op-set
-                                                 (encode-set '(and or xor plus)))))
-             sz <- (choose-one (loop for i from 1 to (- size 2)
+                                                 *binary-op-set*)))
+             sz <- (choose-one (loop for i from 1 to (truncate (/ (1- size) 2))
+             ;;sz <- (choose-one (loop for i from 1 to (- size 2)
                                    collect i))
              sub-term1 <- (construct-term sz vars op-set)
              sub-term2 <- (construct-term (- size sz 1) vars op-set)
