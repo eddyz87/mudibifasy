@@ -223,7 +223,7 @@
 		      e2 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
 		      e3 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
 		      
-		      (if (eq (+ e1 e2 e3) body-size)
+		      (if (= (+ e1 e2 e3) body-size)
 			  (choose-return (list e1 e2 e3))
 			  (fail)))
       term1 <- (construct-term (car expr-sizes) '(x) op-set)
