@@ -1,6 +1,6 @@
 (in-package :md)
 
-(defvar *operators* '(if0 fold not shl1 shr1 shr4 shr16 and or xor plus tfold))
+(defparameter *operators* '(if0 fold not shl1 shr1 shr4 shr16 and or xor plus tfold bonus))
 (loop for op in *operators* 
       for val = 1 then (ash val 1) do
      (setf (get op 'set-val) val))
