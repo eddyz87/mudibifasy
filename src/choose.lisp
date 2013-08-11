@@ -49,6 +49,11 @@
     (declare (ignore cont))
     (funcall fail-cont)))
 
+(defun fail-if (fail?)
+  (if fail?
+    (fail)
+    (choose-return nil)))
+
 (defvar *choose-randomize* nil)
 
 (defun choose-one (lst)
@@ -118,18 +123,21 @@
 (defvar *unary-op-set* (encode-set '(not shl1 shr1 shr4 shr16)))
 (defvar *binary-op-set* (encode-set '(and or xor plus)))
 
-(defun construct-term (size vars op-set)
+(defun construct-term (size vars op-set &optional (current-op))
+;  (format t "construct-term size ~A vars ~A op-set ~A~%" size vars op-set)
   (if (= size 1)
-    (choose-one (append (list 0 1)
+    (choose-one (append (if (and current-op (member current-op '(shr1 shr4 shr16 shl1)))
+                          (if (eq current-op 'shl1)
+                            (list 1)
+                            nil)
+                          (list 0 1))
                         vars))
-    (choose-do
-      size <- (choose-one (loop for i from 1 to size collecting i))
       (choose-merge
         (choose-do
           op <- (choose-one (decode-set
                               (op-intersection op-set
                                                *unary-op-set*)))
-          sub-term <- (construct-term (1- size) vars op-set)
+          sub-term <- (construct-term (1- size) vars op-set op)
           (choose-return (list op sub-term)))
         (if (<= size 2)
           (fail)
@@ -141,6 +149,7 @@
                                     ;;sz <- (choose-one (loop for i from 1 to (- size 2)
                                     collect i))
             sub-term1 <- (construct-term sz vars op-set)
+            (fail-if (and (member op '(and or plus xor)) (equal (bv-fold-constants sub-term1) 0)))
             sub-term2 <- (construct-term (- size sz 1) vars op-set)
             (choose-return
               (list op sub-term1
@@ -153,9 +162,10 @@
                                     collect i))
             sz1 <- (choose-one (loop for i from 1 to (- sz 1)
                                      collect i))
+            sub-term-c <- (construct-term (- size sz 1) vars op-set)
+            (fail-if (member (bv-fold-constants sub-term-c) '(0 1) :test #'equal))
             sub-term-t <- (construct-term sz1 vars op-set)
             sub-term-f <- (construct-term (- sz sz1) vars op-set)
-            sub-term-c <- (construct-term (- size sz 1) vars op-set)
             (choose-return
               (list 'if0 
                     sub-term-c
@@ -182,7 +192,7 @@
                       sub-term-1
                       sub-term-2
                       (list 'lambda (list v1 v2)
-                            sub-term-b))))))))))
+                            sub-term-b)))))))))
 
 (defun construct-program-1 (size op-set)
   (choose-do
@@ -197,7 +207,7 @@
         ;; (format t "Test : ~A~%"
         ;;         (string-downcase (format nil "~A"
         ;;                                  progr)))
-        (if (eq ops op-set)
+        (if t;(eq ops op-set)
             (choose-return progr)
             (fail))))))
 
