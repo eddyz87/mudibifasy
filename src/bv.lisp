@@ -58,22 +58,150 @@
              (fixnum shift))
       (fix-64 (ash v shift))))
 
-(defvar *bv-un-ops* (pairlis '(not shl1 shr1 shr4 shr16)
-                             (list (lambda (v)
-                                     (declare ((unsigned-byte 64) v))
-                                     (fix-64 (lognot v)))
-                                   (make-shift 1)
-                                   (make-shift -1)
-                                   (make-shift -4)
-                                   (make-shift -16))))
+(defparameter *bv-un-ops* (pairlis '(not shl1 shr1 shr4 shr16)
+                                   (list (lambda (v)
+                                           (declare ((unsigned-byte 64) v))
+                                           (fix-64 (lognot v)))
+                                         (make-shift 1)
+                                         (make-shift -1)
+                                         (make-shift -4)
+                                         (make-shift -16))))
 
-(defvar *bv-bin-ops* (pairlis '(and or xor plus)
-                              (list #'logand
-                                    #'logior
-                                    #'logxor
-                                    (lambda (v1 v2)
-                                      (declare ((unsigned-byte 64) v1 v2))
-                                      (fix-64 (+ v1 v2))))))
+(defparameter *bv-bin-ops* (pairlis '(and or xor plus)
+                                    (list #'logand
+                                          #'logior
+                                          #'logxor
+                                          (lambda (v1 v2)
+                                            (declare ((unsigned-byte 64) v1 v2))
+                                            (fix-64 (+ v1 v2))))))
+
+(defstruct unknown
+  (bits 0)
+  (mask 0))
+
+(defun to-unknown (v)
+  (if (typep v 'unknown)
+      v
+      (make-unknown :bits v
+                    :mask (1- *64-bit-max*))))
+
+(defmacro with-unknowns (vars &body body)
+  `(let ,(mapcar (lambda (v)
+                   `(,v (to-unknown ,v)))
+                 vars)
+       ,@body))
+
+(defun make-unk-shift (shift)
+  (lambda (v)
+    (unk-shift v shift)))
+
+(defun unk-shift (v shift)
+  (declare (fixnum shift))
+  (if (typep v 'unknown)
+      (make-unknown :bits (fix-64 (ash (unknown-bits v) shift))
+                    :mask (logior (fix-64 (ash (unknown-mask v) shift))
+                                  (if (> shift 0)
+                                      1
+                                      (logxor (1- *64-bit-max*)
+                                              (1- (ash 1 (+ 64 shift)))))))
+      (fix-64 (ash v shift))))
+
+(defun unk-not (v)
+  (with-unknowns (v)
+    (make-unknown :bits (fix-64 (lognot (unknown-bits v)))
+                  :mask (unknown-mask v))))
+
+(defun wrap-unknown (func)
+  (lambda (v1 v2)
+    (with-unknowns (v1 v2)
+      (if (and (= 0 (lognot (unknown-mask v1)))
+               (= 0 (lognot (unknown-mask v2))))
+          (make-unknown :mask (unknown-mask v1)
+                        :bits (fix-64 (funcall func 
+                                               (unknown-bits v1) 
+                                               (unknown-bits v2))))
+          (make-unknown)))))
+
+(defun unk-logand (v1 v2)
+  (with-unknowns (v1 v2)
+    (let* ((zeros1 (logior (lognot (unknown-mask v1))
+                           (unknown-bits v1)))
+           (zeros2 (logior (lognot (unknown-mask v2))
+                           (unknown-bits v2)))
+           (zeros (logand zeros1 zeros2))
+           (known (logand (logand (unknown-mask v1)
+                                  (unknown-mask v2))
+                          (logand (unknown-bits v1)
+                                  (unknown-bits v2)))))
+      (make-unknown :mask (fix-64
+                           (logior (logand (unknown-mask v1)
+                                           (unknown-mask v2))
+                                   (lognot zeros)))
+                    :bits (logand known zeros)))))
+
+(defun unk-logior (v1 v2)
+  (with-unknowns (v1 v2)
+    (let ((res (unk-logand
+                (make-unknown :mask (unknown-mask v1)
+                              :bits (lognot (unknown-bits v1)))
+                (make-unknown :mask (unknown-mask v2)
+                              :bits (lognot (unknown-bits v2))))))
+      (make-unknown :mask (unknown-mask res)
+                    :bits (fix-64 (lognot (unknown-bits res)))))))
+
+(defun unk-logxor (v1 v2)
+  (with-unknowns (v1 v2)
+    (make-unknown :mask (logand (unknown-mask v1)
+                                (unknown-mask v2))
+                  :bits (logxor (unknown-bits v1)
+                                (unknown-bits v2)))))
+
+(defparameter *bv-un-ops-unk* (pairlis '(not shl1 shr1 shr4 shr16)
+                                 (list #'unk-not
+                                       (make-unk-shift 1)
+                                       (make-unk-shift -1)
+                                       (make-unk-shift -4)
+                                       (make-unk-shift -16))))
+
+(defparameter *bv-bin-ops-unk* (pairlis '(and or xor plus)
+                                  (list #'unk-logand
+                                        #'unk-logior
+                                        #'unk-logxor
+                                        (wrap-unknown (lambda (v1 v2)
+                                                        (declare ((unsigned-byte 64) v1 v2))
+                                                        (fix-64 (+ v1 v2)))))))
+
+(defvar *bv-if-op* 'if)
+(defvar *bv-fold-op* 'fold)
+
+(defun unknown-if (e0 e1 e2)
+  (with-unknowns (e0 e1 e2)
+    (if (= 0 (lognot (unknown-mask e0)))
+        (if (= 0 (unknown-bits e0))
+            e1
+            e2)
+        (if (/= 0 (logand (unknown-mask e0)
+                          (unknown-bits e0)))
+            e2
+            (make-unknown :mask (logand
+                                 (logand (unknown-mask e1)
+                                         (unknown-mask e2))
+                                 (fix-64 (lognot 
+                                          (logxor (unknown-bits e1)
+                                                  (unknown-bits e2)))))
+                          :bits (logand (unknown-bits e1)
+                                        (unknown-bits e2)))))))
+
+(defun unknown-fold (bytes accum top-var func &optional (iter 0))
+  (declare (fixnum iter))
+  (if (= iter 8)
+      accum
+      (unknown-fold 
+       (unk-shift bytes -8)
+       (funcall func (list top-var (unk-logand bytes 255) accum))
+       top-var
+       func
+       (1+ iter))))
 
 (defun bv-compile-expr (term env)
   "Translate \BV expr to lambda ((top-var fold-elem fold-var)).
@@ -95,10 +223,17 @@ env is assoc list of symbol -> function (first | second | third)"
              (let ((arg1 (bv-compile-expr (bv-arg1 term) env))
                    (arg2 (bv-compile-expr (bv-arg2 term) env))
                    (arg3 (bv-compile-expr (bv-arg3 term) env)))
-               (lambda (vars)
-                 (if (= (funcall arg1 vars) 0) 
-                     (funcall arg2 vars)
-                     (funcall arg3 vars)))))
+               (if (eq *bv-if-op* 'if)
+                   (lambda (vars)
+                     (if (= (funcall arg1 vars) 0) 
+                         (funcall arg2 vars)
+                         (funcall arg3 vars)))
+                   (let ((if-fun *bv-if-op*))
+                     (lambda (vars)
+                       (funcall if-fun
+                                (funcall arg1 vars)
+                                (funcall arg2 vars)
+                                (funcall arg3 vars)))))))
            (%make-fold ()
              (let* ((arg1 (bv-compile-expr (bv-arg1 term) env))
                     (arg2 (bv-compile-expr (bv-arg2 term) env))
@@ -108,11 +243,19 @@ env is assoc list of symbol -> function (first | second | third)"
                                            (cons (cons elem-v #'second)
                                                  (cons (cons accum-v #'third)
                                                        env)))))
-               (lambda (vars)
-                 (bv-fold (funcall arg1 vars) 
-                          (funcall arg2 vars) 
-                          (first vars)
-                          body)))))
+               (if (eq *bv-fold-op* 'fold)
+                   (lambda (vars)
+                     (bv-fold (funcall arg1 vars)
+                              (funcall arg2 vars)
+                              (first vars)
+                              body))
+                   (let ((fold-fun *bv-fold-op*))
+                     (lambda (vars)
+                       (funcall fold-fun
+                                (funcall arg1 vars)
+                                (funcall arg2 vars)
+                                (first vars)
+                                body)))))))
     (if (bv-atom? term)
         (if (bv-var? term)
             (bv-lookup-func term env)
@@ -128,6 +271,16 @@ env is assoc list of symbol -> function (first | second | third)"
 (defun bv-compile-program (pr)
   (let ((pr (bv-fold-constants pr)))
     (bv-compile-expr (bv-lambda-body pr)
+                     (list (cons (bv-lambda-var pr)
+                                 #'first)))))
+
+(defun bv-compile-partial-program (pr)
+  (let ((*bv-un-ops* *bv-un-ops-unk*)
+        (*bv-bin-ops* *bv-bin-ops-unk*)
+        (*bv-if-op* #'unknown-if)
+        (*bv-fold-op* #'unknown-fold))
+    (bv-compile-expr ;;(bv-fold-constants 
+                      (bv-lambda-body pr);;)
                      (list (cons (bv-lambda-var pr)
                                  #'first)))))
 
@@ -150,6 +303,11 @@ env is assoc list of symbol -> function (first | second | third)"
     (mapcar (lambda (v)
               (bv-run cpr v))
             vals)))
+
+(defun bv-compiled-run-values (cpr vals)
+  (mapcar (lambda (v)
+            (bv-run cpr v))
+          vals))
 
 (defun bv-check-values (pr inputs results &key (fail-func (lambda (x) 
 							    (declare (ignore x))
@@ -181,7 +339,8 @@ env is assoc list of symbol -> function (first | second | third)"
         (fold (+ 2 (bv-size (bv-arg1 term))
                  (bv-size (bv-arg2 term))
                  (bv-size (bv-fold-lambda-body term))))
-        (lambda (1+ (bv-size (bv-lambda-body term)))))))
+        (lambda (1+ (bv-size (bv-lambda-body term))))
+        (otherwise 0))))
 
 (defun bv-op (term)
   (optima:ematch term
@@ -204,6 +363,28 @@ env is assoc list of symbol -> function (first | second | third)"
 	     (op-union (bv-op e0)
 		       (op-union (bv-op e1)
 				 (bv-op e2)))))))
+
+(defun bv-has-unknown (term)
+  (optima:ematch term
+    ((optima:guard x (bv-atom? x))
+     (typep x 'unknown))
+    ((list 'if0 e0 e1 e2)
+     (or (bv-has-unknown e0)
+         (bv-has-unknown e1)
+         (bv-has-unknown e2)))
+    ((list 'lambda (list _) e0)
+     (bv-has-unknown e0))
+    ((list op e1)
+     (declare (ignore op))
+     (bv-has-unknown e1))
+    ((list op e1 e2)
+     (declare (ignore op))
+     (or (bv-has-unknown e1)
+         (bv-has-unknown e2)))
+    ((list 'fold e0 e1 (list 'lambda (list _ _) e2))
+     (or (bv-has-unknown e0)
+         (bv-has-unknown e1)
+         (bv-has-unknown e2)))))
 
 (defun bv-operators (term)
   (optima:ematch term

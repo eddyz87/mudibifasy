@@ -4,7 +4,7 @@
                (:file "src/http"       :depends-on ("src/packages"))
                (:file "src/help"       :depends-on ("src/http" "src/packages"))
                (:file "src/bv"         :depends-on ("src/packages"))
-               (:file "src/choose"     :depends-on ("src/packages" "src/op-set"))
+               (:file "src/choose"     :depends-on ("src/packages" "src/op-set" "src/bv"))
                (:file "src/glue"       :depends-on ("src/packages" "src/http"))
                (:file "src/solve"      :depends-on ("src/choose" "src/glue"))
                (:file "src/classifier" :depends-on ("src/packages"))
