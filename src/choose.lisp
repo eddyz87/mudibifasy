@@ -214,7 +214,7 @@
                        (list 'lambda (list v1 v2)
                              sub-term-b))))))))))
 
-(defun construct-program-1-bonus (size op-set)
+(defun construct-program-1-bonus (size op-set sample-vals sample-res)
   ;; - (lambda + if0 + and + 1)
   (let ((body-size (- size 4)))
     (choose-do
@@ -232,10 +232,21 @@
 
      (let ((progr `(lambda (x)
 		      (if0 (and ,term1 1) ,term2 ,term3))))
+       (choose-do
+         (let ((unk (bv-has-unknown progr)))
+           (if unk
+               (let ((outs (bv-compiled-run-values
+                            (bv-compile-partial-program progr)
+                            sample-vals)))
+                 (if (every #'unk-equal outs sample-res)
+                     (fail t)
+                     (fail nil)))
+               (progn
+                 (choose-return nil))))
 	(let ((ops (bv-operators progr)))
-	  (if (eq ops op-set)
+	  (if t ;;(eq ops op-set)
 	      (choose-return progr)
-	      (fail)))))))
+	      (fail))))))))
 
 (defun unk-equal (v1 r)
   (if (typep v1 'unknown)

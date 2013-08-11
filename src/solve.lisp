@@ -10,10 +10,15 @@
      (choose-do
        size <- (choose-one (loop for i from 6 to (problem-size problem) collecting i))
        term <- (let ((ex-vals (subseq (problem-examples problem) 0 4)))
-                 (construct-program-1 size
-                                      (encode-set (problem-operators problem))
-                                      (mapcar #'car ex-vals)
-                                      (mapcar #'cdr ex-vals)))
+                 (if (member 'bonus (problem-operators problem))
+                     (construct-program-1-bonus size
+                                                (encode-set (remove 'bonus (problem-operators problem)))
+                                                (mapcar #'car ex-vals)
+                                                (mapcar #'cdr ex-vals))
+                     (construct-program-1 size
+                                          (encode-set (problem-operators problem))
+                                          (mapcar #'car ex-vals)
+                                          (mapcar #'cdr ex-vals))))
        (let ((vals (problem-examples problem)))
          (if (bv-check-values term (mapcar #'car vals)
                               (mapcar #'cdr vals))
