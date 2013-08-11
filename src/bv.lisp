@@ -456,7 +456,7 @@ env is assoc list of symbol -> function (first | second | third)"
                     (with-number2
                       'xor
                       (:e1 (cond ((= e1 0) e2)
-                                 ((= e1 #xFFFFFFFFFFFFFFFF) e2)
+                                 ((= e1 #xFFFFFFFFFFFFFFFF) (fix-64 (lognot e2)))
                                  (t (list 'xor e1 e2))))
                       (:both (logxor e1 e2))
                       (:default
