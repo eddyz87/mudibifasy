@@ -182,6 +182,29 @@
                       (list 'lambda (list v1 v2)
                             sub-term-b)))))))))
 
+(defun construct-program-1-bonus (size op-set)
+  ;; - (lambda + if0)
+  (let ((body-size (- size 2)))
+    (choose-do
+      expr-sizes <- (choose-do
+		      e1 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
+		      e2 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
+		      e3 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
+		      
+		      (if (eq (+ e1 e2 e3) body-size)
+			  (choose-return (list e1 e2 e3))
+			  (fail)))
+      term1 <- (construct-term (car expr-sizes) '(x) op-set)
+      term2 <- (construct-term (cadr expr-sizes) '(x) op-set)
+      term3 <- (construct-term (caddr expr-sizes) '(x) op-set)
+
+      (let ((progr `(lambda (x)
+		      (if0 ,term1 ,term2 ,term3))))
+	(let ((ops (bv-operators progr)))
+	  (if (eq ops op-set)
+	      (choose-return progr)
+	      (fail)))))))
+
 (defun construct-program-1 (size op-set)
   (choose-do
     term <- (if (op-test 'tfold op-set)
@@ -218,7 +241,9 @@
 
 (defun construct-program (size op-set)
   (choose-run-and-return
-   (construct-program-1 size (encode-set op-set))))
+   (if (member 'bonus op-set)
+       (construct-program-1-bonus size (encode-set (remove 'bonus op-set)))
+       (construct-program-1 size (encode-set op-set)))))
 
 (defun guess-program (size op-set vals)
   (choose-run-and-return
