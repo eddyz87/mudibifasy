@@ -237,7 +237,7 @@
           ;; (format t "Test : ~A~%"
           ;;         (string-downcase (format nil "~A"
           ;;                                  progr)))
-          (if (eq ops op-set)
+          (if t;;(eq ops op-set)
               (choose-return progr)
               (fail)))))))
 

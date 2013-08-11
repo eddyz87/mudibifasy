@@ -8,8 +8,9 @@
                                    (return-from guess-problem t))))
     (choose-run-and-return
      (choose-do
+       size <- (choose-one (loop for i from 6 to (problem-size problem) collecting i))
        term <- (let ((ex-vals (subseq (problem-examples problem) 0 4)))
-                 (construct-program-1 (problem-size problem)
+                 (construct-program-1 size
                                       (encode-set (problem-operators problem))
                                       (mapcar #'car ex-vals)
                                       (mapcar #'cdr ex-vals)))
