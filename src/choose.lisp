@@ -33,7 +33,6 @@
 
 (defun choose-return (x)
   (lambda (cont fail-cont val)
-    (declare (ignore val))
     (funcall cont x fail-cont val)))
 
 (defun choose-bind (m f)
@@ -49,8 +48,13 @@
 
 (defun fail (&optional (val :no))
   (lambda (cont fail-cont v1)
-    (declare (ignore cont v1))
+    (declare (ignore cont))
     (funcall fail-cont (if (eq val :no) v1 val))))
+
+(defun fail-if (fail?)
+  (if fail?
+    (fail)
+    (choose-return nil)))
 
 (defvar *choose-randomize* nil)
 
@@ -138,9 +142,13 @@
 (defvar *unary-op-set* (encode-set '(not shl1 shr1 shr4 shr16)))
 (defvar *binary-op-set* (encode-set '(and or xor plus)))
 
-(defun construct-term (size vars op-set)
+(defun construct-term (size vars op-set &optional (current-op))
   (if (= size 1)
-      (choose-one (append (list 0 1)
+      (choose-one (append (if (and current-op (member current-op '(shr1 shr4 shr16 shl1)))
+                              (if (eq current-op 'shl1)
+                                  (list 1)
+                                  nil)
+                              (list 0 1))
                           vars))
       (choose-try
        (choose-return (make-unknown))
@@ -149,7 +157,7 @@
           op <- (choose-one (decode-set
                              (op-intersection op-set
                                               *unary-op-set*)))
-          sub-term <- (construct-term (1- size) vars op-set)
+          sub-term <- (construct-term (1- size) vars op-set op)
           (choose-return (list op sub-term)))
         (if (<= size 2)
             (fail)
@@ -161,6 +169,7 @@
                                    ;;sz <- (choose-one (loop for i from 1 to (- size 2)
                                    collect i))
               sub-term1 <- (construct-term sz vars op-set)
+              (fail-if (and (member op '(and or plus xor)) (equal (bv-fold-constants sub-term1) 0)))
               sub-term2 <- (construct-term (- size sz 1) vars op-set)
               (choose-return
                (list op sub-term1
@@ -173,9 +182,10 @@
                                    collect i))
               sz1 <- (choose-one (loop for i from 1 to (- sz 1)
                                     collect i))
+              sub-term-c <- (construct-term (- size sz 1) vars op-set)
+              (fail-if (member (bv-fold-constants sub-term-c) '(0 1) :test #'equal))
               sub-term-t <- (construct-term sz1 vars op-set)
               sub-term-f <- (construct-term (- sz sz1) vars op-set)
-              sub-term-c <- (construct-term (- size sz 1) vars op-set)
               (choose-return
                (list 'if0 
                      sub-term-c
@@ -203,6 +213,29 @@
                        sub-term-2
                        (list 'lambda (list v1 v2)
                              sub-term-b))))))))))
+
+(defun construct-program-1-bonus (size op-set)
+  ;; - (lambda + if0 + and + 1)
+  (let ((body-size (- size 4)))
+    (choose-do
+      expr-sizes <- (choose-do
+		      e1 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
+		      e2 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
+		      e3 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
+		      
+		      (if (eq (+ e1 e2 e3) body-size)
+			  (choose-return (list e1 e2 e3))
+			  (fail)))
+      term1 <- (construct-term (car expr-sizes) '(x) op-set)
+      term2 <- (construct-term (cadr expr-sizes) '(x) op-set)
+      term3 <- (construct-term (caddr expr-sizes) '(x) op-set)
+
+     (let ((progr `(lambda (x)
+		      (if0 (and ,term1 1) ,term2 ,term3))))
+	(let ((ops (bv-operators progr)))
+	  (if (eq ops op-set)
+	      (choose-return progr)
+	      (fail)))))))
 
 (defun unk-equal (v1 r)
   (if (typep v1 'unknown)
@@ -262,9 +295,9 @@
      (declare (ignore v))
      (return-from choose-run-and-return nil))))
 
-;;(defun construct-program (size op-set)
-;;  (choose-run-and-return
-;;   (construct-program-1 size (encode-set op-set))))
+(defun construct-program (size op-set sample-vals sample-res)
+  (choose-run-and-return
+   (construct-program-1 size (encode-set op-set) sample-vals sample-res)))
 
 (defun guess-program (size op-set vals)
   (choose-run-and-return
