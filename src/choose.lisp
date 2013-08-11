@@ -185,8 +185,8 @@
                             sub-term-b))))))))))
 
 (defun construct-program-1-bonus (size op-set)
-  ;; - (lambda + if0)
-  (let ((body-size (- size 2)))
+  ;; - (lambda + if0 + and + 1)
+  (let ((body-size (- size 4)))
     (choose-do
       expr-sizes <- (choose-do
 		      e1 <- (choose-one (loop for i from 1 to (- body-size 2) collect i))
@@ -201,7 +201,7 @@
       term3 <- (construct-term (caddr expr-sizes) '(x) op-set)
 
       (let ((progr `(lambda (x)
-		      (if0 ,term1 ,term2 ,term3))))
+		      (if0 (and ,term1 1) ,term2 ,term3))))
 	(let ((ops (bv-operators progr)))
 	  (if (eq ops op-set)
 	      (choose-return progr)
