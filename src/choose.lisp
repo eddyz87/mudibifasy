@@ -126,7 +126,7 @@
 (defun construct-term (size vars op-set &optional (current-op))
 ;  (format t "construct-term size ~A vars ~A op-set ~A~%" size vars op-set)
   (if (= size 1)
-    (choose-one (append (if (and current-op (member current-op '(shr1 shr4 shr16 shl1)))
+    (choose-one (append (if (and current-op (member current-op '(shr1 shr4 shr16 shl1) :test #'eq))
                           (if (eq current-op 'shl1)
                             (list 1)
                             nil)
@@ -149,7 +149,7 @@
                                     ;;sz <- (choose-one (loop for i from 1 to (- size 2)
                                     collect i))
             sub-term1 <- (construct-term sz vars op-set)
-            (fail-if (and (member op '(and or plus xor)) (equal (bv-fold-constants sub-term1) 0)))
+            (fail-if (and (member op '(and or plus xor) :test #'eq) (equal (bv-fold-constants sub-term1) 0)))
             sub-term2 <- (construct-term (- size sz 1) vars op-set)
             (choose-return
               (list op sub-term1
