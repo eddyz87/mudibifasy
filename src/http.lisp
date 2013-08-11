@@ -33,6 +33,7 @@
 			(sleep 1)
 			(%try-do-request))
 		   (otherwise 
+		    (warn "The request for ~A had failed:~%  status: ~A~%  reply: ~A" url status reply)
 		    (error "The request for ~A had failed:~%  status: ~A~%  reply: ~A" url status reply))))))
       (%try-do-request))))
 
@@ -101,29 +102,31 @@
 
 (defun request-eval (arguments &key id program)
   "sends an eval request, parameters:
-     arguments - list of the arguments (integer numbers)
-     &key:
-       id - string representing id of the problem
-       program - string representing a program to evaluate
-   either id or program have to be present"
+  arguments - list of the arguments (integer numbers)
+  &key:
+  id - string representing id of the problem
+  program - string representing a program to evaluate
+  either id or program have to be present"
   (labels ((%find-in-response (key response)
-	     (cdr (assoc key response :test #'string=))))
+                              (cdr (assoc key response :test #'string=))))
     (unless (and (or id program)
-		 (not (and id program)))
+                 (not (and id program)))
       (error "Either :id or :program have to be specified, but not both"))
     (let* ((encoded-args (encode-arguments arguments))
-	   (request (lisp2json
-		     (cons
-		      (if id
-			  (cons "id" id)
-			  (cons "program" program))
-		      (list
-		       (cons "arguments" encoded-args)))))
-	   (response (json2lisp (do-request "eval" request)))
-	   (status (%find-in-response "status" response)))
+           (request (lisp2json
+                      (cons
+                        (if id
+                          (cons "id" id)
+                          (cons "program" program))
+                        (list
+                          (cons "arguments" encoded-args)))))
+           (response (json2lisp (do-request "eval" request)))
+           (status (%find-in-response "status" response)))
       (if (string= status "ok")
-	  (decode-arguments (%find-in-response "outputs" response))
-	  (error "~A" (%find-in-response "message" response))))))
+        (decode-arguments (%find-in-response "outputs" response))
+        (progn
+          (warn "request-eval: ~A" response)
+          (error "request-eval: ~A" response))))))
 	
 
 (defun guess (id program)
