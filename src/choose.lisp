@@ -157,6 +157,7 @@
           op <- (choose-one (decode-set
                              (op-intersection op-set
                                               *unary-op-set*)))
+          (fail-if (and (eq op 'not) (eq current-op 'not)))
           sub-term <- (construct-term (1- size) vars op-set op)
           (choose-return (list op sub-term)))
         (if (<= size 2)
@@ -171,6 +172,7 @@
               sub-term1 <- (construct-term sz vars op-set)
               (fail-if (and (member op '(and or plus xor) :test #'eq) (equal (bv-fold-constants sub-term1) 0)))
               sub-term2 <- (construct-term (- size sz 1) vars op-set)
+              (fail-if (and (op-test 'shl1 op-set) (eq op 'plus) (equal sub-term1 sub-term2)))
               (choose-return
                (list op sub-term1
                      sub-term2))))

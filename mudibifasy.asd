@@ -1,5 +1,5 @@
 (asdf:defsystem :mudibifasy
-  :depends-on (:drakma :yason :optima)
+  :depends-on (:drakma :yason :optima :trivial-timeout)
   :components ((:file "src/packages")
                (:file "src/http"       :depends-on ("src/packages"))
                (:file "src/help"       :depends-on ("src/http" "src/packages"))
