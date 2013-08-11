@@ -183,7 +183,7 @@
               sz1 <- (choose-one (loop for i from 1 to (- sz 1)
                                     collect i))
               sub-term-c <- (construct-term (- size sz 1) vars op-set)
-              (fail-if (member (bv-fold-constants sub-term-c) '(0 1) :test #'equal))
+              (fail-if (numberp (bv-fold-constants sub-term-c)))
               sub-term-t <- (construct-term sz1 vars op-set)
               sub-term-f <- (construct-term (- sz sz1) vars op-set)
               (choose-return
